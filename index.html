@@ -1194,7 +1194,7 @@
 
   cariBtn.addEventListener('click', async function(){
     clearMessage(); resultsWrap.style.display='none';
-    const list=[...selected].sort(), failed=[]; let lastErr=''; ALL=[]; let idx=0, done=0;
+    const list=[...selected].sort(), failed=[]; let lastErr=''; ALL=[]; let idx=0, done=0, dupCount=0;
     setLoading(true);
     async function worker(){
       while(idx<list.length){
@@ -1202,7 +1202,16 @@
         try{
           const d=await apiGet({action:'getData',kelas:k,mapel:''});
           if(!d||!d.length) failed.push(k);
-          (d||[]).forEach(r=>ALL.push(Object.assign({},r,{kelas:r.kelas||k,_k:k,_n:parseNilai(r.nilai)})));
+          // Jika siswa yang sama punya data ganda pada Kode Mapel yang sama,
+          // ambil yang paling awal (baris teratas di sheet), abaikan sisanya.
+          const seen=new Set();
+          const dd=(d||[]).filter(r=>{
+            const id=String(r.noPeserta||'').trim()||String(r.nama||'').trim().toLowerCase();
+            const key=k+'|'+id+'|'+String(r.kodeMapel||'').trim().toUpperCase();
+            if(seen.has(key)){ dupCount++; return false; }
+            seen.add(key); return true;
+          });
+          dd.forEach(r=>ALL.push(Object.assign({},r,{kelas:r.kelas||k,_k:k,_n:parseNilai(r.nilai)})));
         }catch(e){ failed.push(k); lastErr=e.message; }
         btnLabel.textContent='Memuat '+(++done)+'/'+list.length+'...';
       }
@@ -1211,6 +1220,7 @@
     setLoading(false);
     if(!ALL.length){ showMessage(lastErr?'Gagal memuat data dari server: '+lastErr:'Tidak ada data ditemukan untuk kelas yang dipilih.','error'); return; }
     if(failed.length) showMessage('Kelas tanpa data / gagal dimuat: '+failed.sort().join(', '),'info');
+    if(dupCount && !failed.length) showMessage(dupCount+' data ganda (Kode Mapel sama) dilewati, yang dipakai data paling awal.','info');
     const m=[...new Set(ALL.map(r=>r.mataPelajaran))].sort();
     mapelFilter.innerHTML='<option value="">Semua Mata Pelajaran (gabungan)</option>'+m.map(x=>'<option value="'+escapeHtml(x)+'">'+escapeHtml(x)+'</option>').join('');
     render();
