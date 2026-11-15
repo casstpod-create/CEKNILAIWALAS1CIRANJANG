@@ -757,6 +757,8 @@
   .sel-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
   .sel-bar .hint{margin:0}
   .analysis{padding:20px 24px 0}
+  .filter-pair{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+  .filter-pair .filter-row{flex:1 1 220px;max-width:420px;margin-bottom:0}
   .filter-row{max-width:420px;margin-bottom:16px}
   .stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:8px}
   .stat-card{border:1px solid var(--card-border);border-radius:12px;padding:12px;background:rgba(212,175,55,.06)}
@@ -904,7 +906,10 @@
       </div>
     </div>
     <div class="analysis" id="analysis">
-      <div class="field filter-row"><label for="mapelFilter">Mata Pelajaran</label><select id="mapelFilter"></select></div>
+      <div class="filter-pair">
+        <div class="field filter-row"><label for="mapelFilter">Mata Pelajaran</label><select id="mapelFilter"></select></div>
+        <div class="field filter-row"><label for="kodeFilter">Kode Mapel</label><select id="kodeFilter"></select></div>
+      </div>
       <div class="stat-cards" id="statCards"></div>
       <h3 class="sec-title">Ringkasan per Kelas</h3>
       <div class="table-scroll"><table><thead><tr><th>Kelas</th><th>Jml Data</th><th>Tertinggi</th><th>Terendah</th><th>Rata-rata</th><th>Median</th></tr></thead><tbody id="statBody"></tbody></table></div>
@@ -1036,6 +1041,7 @@
   const printOnlySubtitle = document.getElementById('printOnlySubtitle');
 
   let ALL=[], view={rows:[]}, charts=[]; const selected=new Set();
+  const kodeFilter=document.getElementById('kodeFilter');
 
   function showMessage(text, type){
     messageBox.textContent = text;
@@ -1113,7 +1119,10 @@
 
   function render(){
     const mp=mapelFilter.value;
-    const rows=ALL.filter(r=>!mp||r.mataPelajaran===mp).sort((a,b)=>a._k.localeCompare(b._k)||String(a.mataPelajaran).localeCompare(String(b.mataPelajaran))||String(a.nama).localeCompare(String(b.nama)));
+    const kd=kodeFilter.value;
+    const rows=ALL.filter(r=>!mp||r.mataPelajaran===mp).filter(r=>!kd||String(r.kodeMapel).trim()===kd).sort((a,b)=>a._k.localeCompare(b._k)||String(a.mataPelajaran).localeCompare(String(b.mataPelajaran))||String(a.nama).localeCompare(String(b.nama)));
+    if(!rows.length) showMessage('Tidak ada data untuk kombinasi Mata Pelajaran dan Kode Mapel yang dipilih.','error');
+    else if(messageBox.className==='error' && /kombinasi Mata Pelajaran/i.test(messageBox.textContent)) clearMessage();
     const byK=groupBy(rows,r=>r._k), ks=Object.keys(byK).sort();
     const perK=ks.map(k=>({label:k,mapel:mp||'Gabungan',s:stat(byK[k]),rows:byK[k]})).filter(x=>x.s);
     const detail=[];
@@ -1164,6 +1173,7 @@
   document.getElementById('dlChartsBtn').addEventListener('click',downloadAllCharts);
   window.addEventListener('beforeprint',function(){charts.forEach(c=>{c.img.src=c.chart.canvas.toDataURL('image/png');});});
   mapelFilter.addEventListener('change',render);
+  kodeFilter.addEventListener('change',render);
 
   function escapeHtml(str){
     return String(str == null ? '' : str)
@@ -1223,6 +1233,8 @@
     if(dupCount && !failed.length) showMessage(dupCount+' data ganda (Kode Mapel sama) dilewati, yang dipakai data paling awal.','info');
     const m=[...new Set(ALL.map(r=>r.mataPelajaran))].sort();
     mapelFilter.innerHTML='<option value="">Semua Mata Pelajaran (gabungan)</option>'+m.map(x=>'<option value="'+escapeHtml(x)+'">'+escapeHtml(x)+'</option>').join('');
+    const kodes=[...new Set(ALL.map(r=>String(r.kodeMapel==null?'':r.kodeMapel).trim()).filter(Boolean))].sort();
+    kodeFilter.innerHTML='<option value="">Semua Kode Mapel</option>'+kodes.map(x=>'<option value="'+escapeHtml(x)+'">'+escapeHtml(x)+'</option>').join('');
     render();
   });
 
